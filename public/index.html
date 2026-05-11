@@ -135,6 +135,21 @@
   .court-chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .court-chip { padding: 5px 12px; border: 1px solid var(--border); background: #fff; border-radius: 999px; cursor: pointer; font-size: 13px; min-width: 40px; text-align: center; }
   .court-chip.on { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+
+  /* Shift roster banner */
+  .roster { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px 10px; }
+  .roster-card { background: var(--plat); border: 1px solid var(--border); border-left: 4px solid var(--navy); border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; }
+  .roster-card.evening { border-left-color: var(--blue); }
+  .roster-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; white-space: nowrap; }
+  .roster-time { font-size: 11px; color: var(--muted); }
+  .roster-input { flex: 1; border: 1px solid transparent; background: transparent; padding: 6px 8px; font-size: 14px; color: var(--navy); font-weight: 600; border-radius: 4px; font-family: inherit; }
+  .roster-input:hover { background: #fff; }
+  .roster-input:focus { outline: none; background: #fff; border-color: var(--green); box-shadow: 0 0 0 2px rgba(149,214,0,0.25); }
+  .roster-input::placeholder { color: #b0bcc1; font-weight: 400; }
+
+  /* Shift gap strip (2-3pm) */
+  .shift-gap { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.04), rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 12px); border-top: 1px dashed var(--muted); border-bottom: 1px dashed var(--muted); pointer-events: none; z-index: 2; }
+  .shift-gap-label { position: absolute; bottom: 1px; right: 4px; font-size: 9px; color: var(--muted); letter-spacing: 0.5px; }
 </style>
 </head>
 <body>
@@ -157,6 +172,8 @@
   </span>
 </div>
 
+<div class="roster" id="roster"></div>
+
 <div class="grid-wrap">
   <div class="grid" id="grid"></div>
 </div>
@@ -164,20 +181,12 @@
 <div class="overlay" id="overlay">
   <div class="modal">
     <h2 id="modalTitle">Add class</h2>
-    <label class="field">Title
-      <input id="f-title" type="text" placeholder="e.g. Junior Beginners" />
+    <label class="field">Category
+      <select id="f-category">
+        <option value="adult">Adult</option>
+        <option value="junior">Junior</option>
+      </select>
     </label>
-    <div class="row">
-      <label class="field">Category
-        <select id="f-category">
-          <option value="adult">Adult</option>
-          <option value="junior">Junior</option>
-        </select>
-      </label>
-      <label class="field">Coach(es)
-        <input id="f-coach" type="text" placeholder="e.g. Bhodi, Sam" />
-      </label>
-    </div>
     <div class="row" id="adult-row">
       <label class="field" style="flex:1;">Adult level
         <select id="f-adult-level"></select>
@@ -238,6 +247,8 @@ const SLOTS_PER_HOUR = 60 / SLOT_MIN;
 const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
 const SLOT_PX = 36;
 const COLORS = ['#2596b5', '#1b4458', '#95d600', '#7c4dff', '#f57c00', '#c2185b', '#00897b', '#5d4037'];
+const MORNING_RANGE = { start: '06:00', end: '14:00', label: '6a–2p' };
+const EVENING_RANGE = { start: '15:00', end: '22:00', label: '3p–10p' };
 
 const ADULT_LEVELS = [
   'Beginner',
@@ -303,6 +314,7 @@ async function bootstrap(){
     for (const f of FACILITIES) {
       const v = data[f.key];
       state[f.id] = (v && typeof v === 'object' && Array.isArray(v.blocks)) ? v : {blocks:[]};
+      if (!state[f.id].roster) state[f.id].roster = {};
     }
     setSync('✓ Synced');
   } catch(e) { setSync('⚠ Offline'); }
@@ -331,7 +343,7 @@ function renderTabs(){
   ).join('');
   el.querySelectorAll('.tab').forEach(b => b.onclick = () => {
     activeFacility = b.dataset.fac;
-    renderTabs(); renderGrid();
+    renderTabs(); renderRoster(); renderGrid();
   });
 }
 function renderDayTabs(){
@@ -341,7 +353,32 @@ function renderDayTabs(){
   ).join('');
   el.querySelectorAll('.day-tab').forEach(b => b.onclick = () => {
     activeDay = +b.dataset.day;
-    renderDayTabs(); renderGrid();
+    renderDayTabs(); renderRoster(); renderGrid();
+  });
+}
+
+function renderRoster(){
+  const el = document.getElementById('roster');
+  const r = (state[activeFacility].roster || {})[activeDay] || {};
+  el.innerHTML = `
+    <div class="roster-card morning">
+      <span class="roster-label">Morning</span>
+      <span class="roster-time">${MORNING_RANGE.label}</span>
+      <input class="roster-input" data-shift="morning" placeholder="Add coach(es)…" value="${escapeHtml(r.morning||'')}" />
+    </div>
+    <div class="roster-card evening">
+      <span class="roster-label">Evening</span>
+      <span class="roster-time">${EVENING_RANGE.label}</span>
+      <input class="roster-input" data-shift="evening" placeholder="Add coach(es)…" value="${escapeHtml(r.evening||'')}" />
+    </div>`;
+  el.querySelectorAll('.roster-input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const fac = state[activeFacility];
+      if (!fac.roster) fac.roster = {};
+      if (!fac.roster[activeDay]) fac.roster[activeDay] = {};
+      fac.roster[activeDay][inp.dataset.shift] = inp.value.trim();
+      persist(activeFacility);
+    });
   });
 }
 
@@ -374,6 +411,13 @@ function renderGrid(){
       const label = c === 1 ? '<span class="camp-band-label">SUMMER CAMP ZONE</span>' : '';
       html += `<div class="camp-band" style="top:${top}px;height:${height}px;">${label}</div>`;
     }
+    // shift gap (2pm-3pm)
+    {
+      const gapTop = timeToSlot('14:00') * SLOT_PX;
+      const gapHeight = (timeToSlot('15:00') - timeToSlot('14:00')) * SLOT_PX;
+      const label = c === 1 ? '<span class="shift-gap-label">SHIFT CHANGE</span>' : '';
+      html += `<div class="shift-gap" style="top:${gapTop}px;height:${gapHeight}px;">${label}</div>`;
+    }
     // blocks for this court+day
     const blocks = (state[activeFacility].blocks || []).filter(b => b.day === activeDay && Array.isArray(b.courts) && b.courts.includes(c));
     for (const b of blocks){
@@ -381,14 +425,12 @@ function renderGrid(){
       const height = (timeToSlot(b.end) - timeToSlot(b.start)) * SLOT_PX - 2;
       const semCls = b.semester ? 'semester' : '';
       const semBadge = b.semester ? '<span class="sem-badge">SEM</span>' : '';
-      const meta = [b.level, (b.courts.length > 1 ? 'Cts ' + b.courts.map(x=>COURT_LABELS[x-1]).join(',') : '')].filter(Boolean).join(' · ');
-      const coach = b.coach ? `<div class="b-coach">${escapeHtml(b.coach)}</div>` : '';
+      const courtTag = b.courts.length > 1 ? ' · Cts ' + b.courts.map(x=>COURT_LABELS[x-1]).join(',') : '';
       html += `<div class="block ${semCls}" data-id="${b.id}"
         style="top:${top}px;height:${height}px;background:${b.color||'#2596b5'};">
         ${semBadge}
-        <div class="b-title">${escapeHtml(b.title||'(untitled)')}</div>
-        <div class="b-meta">${fmt12(b.start)}–${fmt12(b.end)}${meta?' · '+escapeHtml(meta):''}</div>
-        ${coach}
+        <div class="b-title">${escapeHtml(b.level||'(no level)')}</div>
+        <div class="b-meta">${fmt12(b.start)}–${fmt12(b.end)}${courtTag}</div>
       </div>`;
     }
     html += '</div>';
@@ -517,8 +559,6 @@ function openCreate(day, startTime, endTime, court){
   editingId = null;
   document.getElementById('modalTitle').textContent = 'Add class';
   document.getElementById('deleteBtn').style.display = 'none';
-  document.getElementById('f-title').value = '';
-  document.getElementById('f-coach').value = '';
   document.getElementById('f-notes').value = '';
   document.getElementById('f-day').value = day;
   document.getElementById('f-start').value = startTime;
@@ -533,7 +573,6 @@ function openCreate(day, startTime, endTime, court){
   refreshSwatches();
   refreshCourtChips();
   document.getElementById('overlay').classList.add('open');
-  document.getElementById('f-title').focus();
 }
 function openEdit(id){
   const b = state[activeFacility].blocks.find(x => x.id === id);
@@ -541,8 +580,6 @@ function openEdit(id){
   editingId = id;
   document.getElementById('modalTitle').textContent = 'Edit class';
   document.getElementById('deleteBtn').style.display = '';
-  document.getElementById('f-title').value = b.title || '';
-  document.getElementById('f-coach').value = b.coach || '';
   const cat = b.category || (b.juniorAge ? 'junior' : 'adult');
   setCategoryUI(cat);
   if (cat === 'adult') {
@@ -570,33 +607,31 @@ function openEdit(id){
 function closeModal(){ document.getElementById('overlay').classList.remove('open'); editingId = null; }
 
 function saveModal(){
-  const title = document.getElementById('f-title').value.trim();
   const category = document.getElementById('f-category').value;
   const adultLevel = document.getElementById('f-adult-level').value;
   const juniorAge = document.getElementById('f-junior-age').value;
   const juniorSkill = document.getElementById('f-junior-skill').value;
   const level = composeLevel(category, adultLevel, juniorAge, juniorSkill);
-  const coach = document.getElementById('f-coach').value.trim();
   const day = +document.getElementById('f-day').value;
   const start = document.getElementById('f-start').value;
   const end = document.getElementById('f-end').value;
   const notes = document.getElementById('f-notes').value.trim();
   const semester = document.getElementById('f-semester').checked;
-  if (!title) { alert('Title is required'); return; }
   if (timeToSlot(end) <= timeToSlot(start)) { alert('End must be after start'); return; }
   const courts = selectedCourts.slice().sort((a,b)=>a-b);
   const blocks = state[activeFacility].blocks;
   const extras = { category, adultLevel: category==='adult'?adultLevel:null, juniorAge: category==='junior'?juniorAge:null, juniorSkill: category==='junior'?juniorSkill:null };
   if (editingId){
     const b = blocks.find(x => x.id === editingId);
-    Object.assign(b, { title, level, coach, day, start, end, notes, semester, color: selectedColor, courts, ...extras });
+    Object.assign(b, { level, day, start, end, notes, semester, color: selectedColor, courts, ...extras });
   } else {
-    blocks.push({ id: uid(), title, level, coach, day, start, end, notes, semester, color: selectedColor, courts, ...extras });
+    blocks.push({ id: uid(), level, day, start, end, notes, semester, color: selectedColor, courts, ...extras });
   }
   if (day !== activeDay) activeDay = day;
   persist(activeFacility);
   closeModal();
   renderDayTabs();
+  renderRoster();
   renderGrid();
 }
 function deleteBlock(){
@@ -634,6 +669,7 @@ function deleteBlock(){
   renderTabs();
   renderDayTabs();
   await bootstrap();
+  renderRoster();
   renderGrid();
 })();
 </script>
