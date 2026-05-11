@@ -1,0 +1,8 @@
+name = "rippner-master-schedule"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "public"
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "rippner-scheduling"
+database_id   = "0c77bad9-5a46-4e19-b500-d9b6d0090191"

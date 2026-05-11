@@ -1,0 +1,565 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Rippner Master Schedule</title>
+<style>
+  :root {
+    --green: #95d600;
+    --navy:  #1b4458;
+    --blue:  #2596b5;
+    --plat:  #F1F5F5;
+    --border:#d8e1e3;
+    --muted: #6b7c83;
+    --camp-band: rgba(149,214,0,0.10);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, system-ui, sans-serif; color: #1a2326; background: #fff; }
+  header { position: sticky; top: 0; z-index: 20; background: #fff; border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 16px; }
+  header h1 { font-size: 18px; margin: 0; color: var(--navy); }
+  header .sync { margin-left: auto; font-size: 12px; color: var(--muted); }
+
+  .tabs { display: flex; gap: 4px; padding: 8px 20px 0; border-bottom: 1px solid var(--border); background: #fff; position: sticky; top: 53px; z-index: 19; }
+  .tab { padding: 8px 16px; border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0; background: transparent; cursor: pointer; font-size: 14px; color: var(--muted); }
+  .tab.active { background: var(--plat); color: var(--navy); border-color: var(--border); font-weight: 600; }
+
+  .day-tabs { display: flex; gap: 6px; padding: 10px 20px; flex-wrap: wrap; background: var(--plat); border-bottom: 1px solid var(--border); position: sticky; top: 95px; z-index: 18; }
+  .day-tab { padding: 6px 14px; border: 1px solid var(--border); border-radius: 999px; background: #fff; cursor: pointer; font-size: 13px; color: var(--muted); }
+  .day-tab.active { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+
+  .toolbar { padding: 10px 20px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 13px; }
+  .toolbar .legend { display: flex; gap: 14px; margin-left: auto; align-items: center; color: var(--muted); }
+  .legend .sample { display: inline-block; width: 18px; height: 12px; border-radius: 3px; vertical-align: middle; margin-right: 5px; }
+  .legend .sem { border: 2px dashed var(--navy); background: #fff; }
+  .legend .reg { background: var(--blue); }
+  .legend .band { background: var(--camp-band); border-top: 2px dotted var(--navy); border-bottom: 2px dotted var(--navy); }
+
+  button.btn { padding: 6px 12px; border: 1px solid var(--border); background: #fff; border-radius: 5px; cursor: pointer; font-size: 13px; }
+  button.btn:hover { background: var(--plat); }
+  button.btn.primary { background: var(--navy); color: #fff; border-color: var(--navy); }
+  button.btn.primary:hover { background: #102d3a; }
+  button.btn.danger { background: #fff; color: #b00020; border-color: #f2c7cd; }
+
+  /* Grid */
+  .grid-wrap { padding: 0 20px 40px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 80px repeat(6, 1fr);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: #fff;
+    user-select: none;
+  }
+  .gh { background: var(--plat); padding: 10px 6px; font-size: 13px; font-weight: 700; color: var(--navy); text-align: center; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); }
+  .gh:last-child { border-right: none; }
+  .time-col { display: grid; grid-auto-rows: 36px; border-right: 1px solid var(--border); }
+  .time-label { font-size: 12px; color: var(--muted); padding: 0 8px; border-top: 1px solid var(--border); display: flex; align-items: flex-start; justify-content: flex-end; padding-top: 2px; background: var(--plat); }
+  .time-label.hour { font-weight: 600; color: var(--navy); }
+  .court-col {
+    position: relative;
+    display: grid; grid-auto-rows: 36px;
+    border-right: 1px solid var(--border);
+    cursor: cell;
+  }
+  .court-col:last-child { border-right: none; }
+  .slot { border-top: 1px solid var(--border); }
+  .slot.hour { border-top-color: #c2cdcf; }
+  .slot.half { border-top-style: dashed; border-top-color: #ecf0f1; }
+
+  /* Summer camp band */
+  .camp-band {
+    position: absolute; left: 0; right: 0;
+    background: var(--camp-band);
+    border-top: 2px dotted var(--navy);
+    border-bottom: 2px dotted var(--navy);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .camp-band-label { position: absolute; bottom: 2px; left: 4px; font-size: 9px; color: var(--navy); font-weight: 600; letter-spacing: 0.5px; opacity: 0.7; }
+
+  /* Drag preview */
+  .drag-preview {
+    position: absolute; left: 0; right: 0;
+    background: rgba(149,214,0,0.35);
+    border: 2px dashed var(--navy);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 4;
+    color: var(--navy);
+    font-size: 11px;
+    padding: 4px 6px;
+    font-weight: 600;
+  }
+
+  /* Blocks */
+  .block {
+    position: absolute; left: 2px; right: 2px;
+    background: var(--blue); color: #fff;
+    border-radius: 4px;
+    padding: 5px 7px;
+    font-size: 12px;
+    line-height: 1.3;
+    overflow: hidden;
+    cursor: pointer;
+    z-index: 3;
+    border: 2px solid transparent;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+  .block:hover { filter: brightness(1.08); }
+  .block .b-title { font-weight: 700; }
+  .block .b-meta  { font-size: 10px; opacity: 0.95; margin-top: 1px; }
+  .block .b-coach { font-size: 10px; opacity: 0.9; margin-top: 1px; font-style: italic; }
+  .block.semester { border: 2px dashed #fff; box-shadow: 0 0 0 2px var(--navy), 0 1px 2px rgba(0,0,0,0.15); }
+  .block .sem-badge { position: absolute; top: 3px; right: 5px; font-size: 9px; background: rgba(0,0,0,0.3); padding: 1px 5px; border-radius: 3px; font-weight: 700; letter-spacing: 0.5px; }
+  .block.multi-court { left: 0; right: 0; padding-left: 8px; }
+
+  /* Modal */
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 8px; width: min(520px, 92vw); padding: 22px; max-height: 90vh; overflow: auto; }
+  .modal h2 { margin: 0 0 14px; font-size: 17px; color: var(--navy); }
+  .row { display: flex; gap: 10px; margin-bottom: 10px; }
+  .row > * { flex: 1; }
+  label.field { display: flex; flex-direction: column; font-size: 12px; color: var(--muted); gap: 4px; }
+  label.field input, label.field select, label.field textarea {
+    padding: 7px 9px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; color: #1a2326; font-family: inherit;
+  }
+  label.field input:focus, label.field select:focus, label.field textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 2px rgba(149,214,0,0.25); }
+  label.check { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+  .color-swatches { display: flex; gap: 6px; flex-wrap: wrap; }
+  .swatch { width: 26px; height: 26px; border-radius: 4px; cursor: pointer; border: 2px solid transparent; }
+  .swatch.selected { border-color: var(--navy); }
+  .court-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .court-chip { padding: 5px 12px; border: 1px solid var(--border); background: #fff; border-radius: 999px; cursor: pointer; font-size: 13px; min-width: 40px; text-align: center; }
+  .court-chip.on { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Rippner Tennis — Master Weekly Schedule</h1>
+  <span class="sync" id="sync">·</span>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<div class="day-tabs" id="dayTabs"></div>
+
+<div class="toolbar">
+  <button class="btn primary" id="addBtn">+ Add class</button>
+  <button class="btn" id="exportBtn">Export JSON</button>
+  <span class="legend">
+    <span><span class="sample reg"></span>Regular</span>
+    <span><span class="sample sem"></span>Semester</span>
+    <span><span class="sample band"></span>Summer camp band (Mon–Thu 9:30–12:30)</span>
+  </span>
+</div>
+
+<div class="grid-wrap">
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="modalTitle">Add class</h2>
+    <label class="field">Title
+      <input id="f-title" type="text" placeholder="e.g. Junior Beginners" />
+    </label>
+    <div class="row">
+      <label class="field">Level
+        <input id="f-level" type="text" list="levels" placeholder="e.g. Beginner, Intermediate" />
+        <datalist id="levels">
+          <option>Red Ball</option><option>Orange Ball</option><option>Green Ball</option>
+          <option>Beginner</option><option>Advanced Beginner</option>
+          <option>Intermediate</option><option>Advanced</option><option>High Performance</option>
+          <option>Adult 2.5</option><option>Adult 3.0</option><option>Adult 3.5</option><option>Adult 4.0+</option>
+        </datalist>
+      </label>
+      <label class="field">Coach(es)
+        <input id="f-coach" type="text" placeholder="e.g. Bhodi, Sam" />
+      </label>
+    </div>
+    <div class="row">
+      <label class="field">Day
+        <select id="f-day"></select>
+      </label>
+      <label class="field">Start
+        <select id="f-start"></select>
+      </label>
+      <label class="field">End
+        <select id="f-end"></select>
+      </label>
+    </div>
+    <label class="field" style="margin-bottom:10px;">Courts
+      <div id="f-courts" class="court-chips"></div>
+    </label>
+    <label class="field">Notes
+      <textarea id="f-notes" rows="2" placeholder="optional"></textarea>
+    </label>
+    <div class="row" style="align-items:flex-end;">
+      <label class="field">Color
+        <div class="color-swatches" id="f-colors"></div>
+      </label>
+      <label class="check"><input id="f-semester" type="checkbox" /> Semester class</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn danger" id="deleteBtn" style="margin-right:auto; display:none;">Delete</button>
+      <button class="btn" id="cancelBtn">Cancel</button>
+      <button class="btn primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const FACILITIES = [
+  { id: 'satc',  name: 'SATC',  key: 'master_satc'  },
+  { id: 'pharr', name: 'Pharr', key: 'master_pharr' },
+  { id: 'wilco', name: 'Wilco', key: 'master_wilco' },
+];
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const COURT_LABELS = ['1','2','3','4','5','W']; // 5 courts + hitting wall
+const COURT_COUNT = COURT_LABELS.length;
+const SLOT_MIN = 30;
+const START_HOUR = 6;
+const END_HOUR   = 22;
+const SLOTS_PER_HOUR = 60 / SLOT_MIN;
+const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
+const SLOT_PX = 36;
+const COLORS = ['#2596b5', '#1b4458', '#95d600', '#7c4dff', '#f57c00', '#c2185b', '#00897b', '#5d4037'];
+
+let activeFacility = 'satc';
+let activeDay = 0;
+let state = { satc: {blocks:[]}, pharr: {blocks:[]}, wilco: {blocks:[]} };
+let editingId = null;
+let selectedColor = COLORS[0];
+let selectedCourts = [1];
+let saveTimers = {};
+
+// drag state
+let drag = null; // { court, startSlot, currentSlot, colEl, previewEl }
+
+// --- helpers ---
+function pad(n){ return n < 10 ? '0'+n : ''+n; }
+function slotToTime(slot){
+  const totalMin = START_HOUR*60 + slot*SLOT_MIN;
+  return pad(Math.floor(totalMin/60)) + ':' + pad(totalMin%60);
+}
+function timeToSlot(t){
+  const [h,m] = t.split(':').map(Number);
+  return (h - START_HOUR) * SLOTS_PER_HOUR + (m / SLOT_MIN);
+}
+function fmt12(t){
+  const [h,m] = t.split(':').map(Number);
+  const period = h >= 12 ? 'p' : 'a';
+  const hh = ((h+11)%12)+1;
+  return m === 0 ? `${hh}${period}` : `${hh}:${pad(m)}${period}`;
+}
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// --- persistence ---
+function setSync(label){ document.getElementById('sync').textContent = label; }
+async function bootstrap(){
+  setSync('Loading…');
+  try {
+    const r = await fetch('/api/state');
+    const data = await r.json();
+    for (const f of FACILITIES) {
+      const v = data[f.key];
+      state[f.id] = (v && typeof v === 'object' && Array.isArray(v.blocks)) ? v : {blocks:[]};
+    }
+    setSync('✓ Synced');
+  } catch(e) { setSync('⚠ Offline'); }
+}
+function persist(facId){
+  setSync('Saving…');
+  clearTimeout(saveTimers[facId]);
+  saveTimers[facId] = setTimeout(async () => {
+    const key = FACILITIES.find(f=>f.id===facId).key;
+    try {
+      const r = await fetch('/api/state/'+key, {
+        method: 'PUT', headers: {'content-type':'application/json'},
+        body: JSON.stringify(state[facId])
+      });
+      if (!r.ok) throw 0;
+      setSync('✓ Synced');
+    } catch(e) { setSync('⚠ Sync failed'); }
+  }, 300);
+}
+
+// --- rendering ---
+function renderTabs(){
+  const el = document.getElementById('tabs');
+  el.innerHTML = FACILITIES.map(f =>
+    `<button class="tab ${f.id===activeFacility?'active':''}" data-fac="${f.id}">${f.name}</button>`
+  ).join('');
+  el.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+    activeFacility = b.dataset.fac;
+    renderTabs(); renderGrid();
+  });
+}
+function renderDayTabs(){
+  const el = document.getElementById('dayTabs');
+  el.innerHTML = DAYS.map((d,i) =>
+    `<button class="day-tab ${i===activeDay?'active':''}" data-day="${i}">${d}</button>`
+  ).join('');
+  el.querySelectorAll('.day-tab').forEach(b => b.onclick = () => {
+    activeDay = +b.dataset.day;
+    renderDayTabs(); renderGrid();
+  });
+}
+
+function renderGrid(){
+  const g = document.getElementById('grid');
+  let html = '';
+  // header
+  html += '<div class="gh">Time</div>';
+  for (const lbl of COURT_LABELS) html += `<div class="gh">${lbl === 'W' ? 'Wall' : 'Court ' + lbl}</div>`;
+  // time column
+  html += '<div class="time-col">';
+  for (let s=0; s<TOTAL_SLOTS; s++){
+    const t = slotToTime(s);
+    const isHour = t.endsWith(':00');
+    html += `<div class="time-label ${isHour?'hour':''}">${isHour?fmt12(t):''}</div>`;
+  }
+  html += '</div>';
+  // court columns
+  for (let c=1; c<=COURT_COUNT; c++){
+    html += `<div class="court-col" data-court="${c}">`;
+    for (let s=0; s<TOTAL_SLOTS; s++){
+      const t = slotToTime(s);
+      const cls = t.endsWith(':00') ? 'hour' : 'half';
+      html += `<div class="slot ${cls}" data-slot="${s}"></div>`;
+    }
+    // camp band on Mon-Thu
+    if (activeDay <= 3) {
+      const top = timeToSlot('09:30') * SLOT_PX;
+      const height = (timeToSlot('12:30') - timeToSlot('09:30')) * SLOT_PX;
+      const label = c === 1 ? '<span class="camp-band-label">SUMMER CAMP ZONE</span>' : '';
+      html += `<div class="camp-band" style="top:${top}px;height:${height}px;">${label}</div>`;
+    }
+    // blocks for this court+day
+    const blocks = (state[activeFacility].blocks || []).filter(b => b.day === activeDay && Array.isArray(b.courts) && b.courts.includes(c));
+    for (const b of blocks){
+      const top = timeToSlot(b.start) * SLOT_PX;
+      const height = (timeToSlot(b.end) - timeToSlot(b.start)) * SLOT_PX - 2;
+      const semCls = b.semester ? 'semester' : '';
+      const semBadge = b.semester ? '<span class="sem-badge">SEM</span>' : '';
+      const meta = [b.level, (b.courts.length > 1 ? 'Cts ' + b.courts.map(x=>COURT_LABELS[x-1]).join(',') : '')].filter(Boolean).join(' · ');
+      const coach = b.coach ? `<div class="b-coach">${escapeHtml(b.coach)}</div>` : '';
+      html += `<div class="block ${semCls}" data-id="${b.id}"
+        style="top:${top}px;height:${height}px;background:${b.color||'#2596b5'};">
+        ${semBadge}
+        <div class="b-title">${escapeHtml(b.title||'(untitled)')}</div>
+        <div class="b-meta">${fmt12(b.start)}–${fmt12(b.end)}${meta?' · '+escapeHtml(meta):''}</div>
+        ${coach}
+      </div>`;
+    }
+    html += '</div>';
+  }
+  g.innerHTML = html;
+
+  // wire interactions
+  g.querySelectorAll('.court-col').forEach(col => {
+    col.addEventListener('mousedown', onColMouseDown);
+    col.addEventListener('click', onColClick);
+  });
+}
+
+// --- drag-to-create ---
+function slotFromEvent(colEl, e){
+  const rect = colEl.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  return Math.max(0, Math.min(TOTAL_SLOTS - 1, Math.floor(y / SLOT_PX)));
+}
+function onColClick(e){
+  // single-click on a block opens edit (drag handles new blocks)
+  const blockEl = e.target.closest('.block');
+  if (blockEl) openEdit(blockEl.dataset.id);
+}
+function onColMouseDown(e){
+  if (e.button !== 0) return;
+  if (e.target.closest('.block')) return; // let click handler take it
+  const colEl = e.currentTarget;
+  const court = +colEl.dataset.court;
+  const startSlot = slotFromEvent(colEl, e);
+  drag = { court, startSlot, currentSlot: startSlot, colEl, previewEl: null };
+
+  const preview = document.createElement('div');
+  preview.className = 'drag-preview';
+  colEl.appendChild(preview);
+  drag.previewEl = preview;
+  updateDragPreview();
+
+  window.addEventListener('mousemove', onDragMove);
+  window.addEventListener('mouseup',   onDragEnd, { once: true });
+  e.preventDefault();
+}
+function onDragMove(e){
+  if (!drag) return;
+  drag.currentSlot = slotFromEvent(drag.colEl, e);
+  updateDragPreview();
+}
+function updateDragPreview(){
+  const a = Math.min(drag.startSlot, drag.currentSlot);
+  const b = Math.max(drag.startSlot, drag.currentSlot) + 1; // inclusive end-slot
+  const top = a * SLOT_PX;
+  const height = (b - a) * SLOT_PX - 2;
+  drag.previewEl.style.top = top + 'px';
+  drag.previewEl.style.height = height + 'px';
+  drag.previewEl.textContent = `${fmt12(slotToTime(a))} – ${fmt12(slotToTime(b))}`;
+}
+function onDragEnd(e){
+  window.removeEventListener('mousemove', onDragMove);
+  if (!drag) return;
+  const a = Math.min(drag.startSlot, drag.currentSlot);
+  const b = Math.max(drag.startSlot, drag.currentSlot) + 1;
+  const court = drag.court;
+  drag.previewEl.remove();
+  drag = null;
+  openCreate(activeDay, slotToTime(a), slotToTime(b), court);
+}
+
+// --- modal ---
+function buildTimeOptions(){
+  const opts = [];
+  for (let s=0; s<=TOTAL_SLOTS; s++){
+    const t = slotToTime(s);
+    opts.push(`<option value="${t}">${fmt12(t)} (${t})</option>`);
+  }
+  return opts.join('');
+}
+function buildDayOptions(){
+  return DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join('');
+}
+function refreshSwatches(){
+  const el = document.getElementById('f-colors');
+  el.innerHTML = COLORS.map(c =>
+    `<div class="swatch ${c===selectedColor?'selected':''}" data-color="${c}" style="background:${c}"></div>`
+  ).join('');
+  el.querySelectorAll('.swatch').forEach(s => {
+    s.onclick = () => { selectedColor = s.dataset.color; refreshSwatches(); };
+  });
+}
+function refreshCourtChips(){
+  const el = document.getElementById('f-courts');
+  el.innerHTML = COURT_LABELS.map((lbl,i)=>{
+    const n = i+1;
+    const on = selectedCourts.includes(n);
+    return `<div class="court-chip ${on?'on':''}" data-court="${n}">${lbl}</div>`;
+  }).join('');
+  el.querySelectorAll('.court-chip').forEach(b => b.onclick = () => {
+    const n = +b.dataset.court;
+    if (selectedCourts.includes(n)) selectedCourts = selectedCourts.filter(x=>x!==n);
+    else selectedCourts.push(n);
+    if (!selectedCourts.length) selectedCourts = [n];
+    refreshCourtChips();
+  });
+}
+
+function openCreate(day, startTime, endTime, court){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = 'Add class';
+  document.getElementById('deleteBtn').style.display = 'none';
+  document.getElementById('f-title').value = '';
+  document.getElementById('f-level').value = '';
+  document.getElementById('f-coach').value = '';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('f-day').value = day;
+  document.getElementById('f-start').value = startTime;
+  document.getElementById('f-end').value = endTime;
+  document.getElementById('f-semester').checked = false;
+  selectedColor = COLORS[0];
+  selectedCourts = [court || 1];
+  refreshSwatches();
+  refreshCourtChips();
+  document.getElementById('overlay').classList.add('open');
+  document.getElementById('f-title').focus();
+}
+function openEdit(id){
+  const b = state[activeFacility].blocks.find(x => x.id === id);
+  if (!b) return;
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'Edit class';
+  document.getElementById('deleteBtn').style.display = '';
+  document.getElementById('f-title').value = b.title || '';
+  document.getElementById('f-level').value = b.level || '';
+  document.getElementById('f-coach').value = b.coach || '';
+  document.getElementById('f-notes').value = b.notes || '';
+  document.getElementById('f-day').value = b.day;
+  document.getElementById('f-start').value = b.start;
+  document.getElementById('f-end').value = b.end;
+  document.getElementById('f-semester').checked = !!b.semester;
+  selectedColor = b.color || COLORS[0];
+  selectedCourts = (Array.isArray(b.courts) && b.courts.length) ? b.courts.slice() : [1];
+  refreshSwatches();
+  refreshCourtChips();
+  document.getElementById('overlay').classList.add('open');
+}
+function closeModal(){ document.getElementById('overlay').classList.remove('open'); editingId = null; }
+
+function saveModal(){
+  const title = document.getElementById('f-title').value.trim();
+  const level = document.getElementById('f-level').value.trim();
+  const coach = document.getElementById('f-coach').value.trim();
+  const day = +document.getElementById('f-day').value;
+  const start = document.getElementById('f-start').value;
+  const end = document.getElementById('f-end').value;
+  const notes = document.getElementById('f-notes').value.trim();
+  const semester = document.getElementById('f-semester').checked;
+  if (!title) { alert('Title is required'); return; }
+  if (timeToSlot(end) <= timeToSlot(start)) { alert('End must be after start'); return; }
+  const courts = selectedCourts.slice().sort((a,b)=>a-b);
+  const blocks = state[activeFacility].blocks;
+  if (editingId){
+    const b = blocks.find(x => x.id === editingId);
+    Object.assign(b, { title, level, coach, day, start, end, notes, semester, color: selectedColor, courts });
+  } else {
+    blocks.push({ id: uid(), title, level, coach, day, start, end, notes, semester, color: selectedColor, courts });
+  }
+  if (day !== activeDay) activeDay = day;
+  persist(activeFacility);
+  closeModal();
+  renderDayTabs();
+  renderGrid();
+}
+function deleteBlock(){
+  if (!editingId) return;
+  if (!confirm('Delete this class?')) return;
+  state[activeFacility].blocks = state[activeFacility].blocks.filter(b => b.id !== editingId);
+  persist(activeFacility);
+  closeModal();
+  renderGrid();
+}
+
+// --- init ---
+(async function init(){
+  document.getElementById('f-day').innerHTML = buildDayOptions();
+  document.getElementById('f-start').innerHTML = buildTimeOptions();
+  document.getElementById('f-end').innerHTML = buildTimeOptions();
+  document.getElementById('addBtn').onclick = () => openCreate(activeDay, '09:00', '10:00', 1);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = saveModal;
+  document.getElementById('deleteBtn').onclick = deleteBlock;
+  document.getElementById('overlay').onclick = (e) => { if (e.target.id === 'overlay') closeModal(); };
+  document.getElementById('exportBtn').onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'master-schedule.json';
+    a.click();
+  };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.getElementById('overlay').classList.contains('open')) closeModal();
+  });
+  renderTabs();
+  renderDayTabs();
+  await bootstrap();
+  renderGrid();
+})();
+</script>
+
+</body>
+</html>
