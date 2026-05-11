@@ -168,17 +168,27 @@
       <input id="f-title" type="text" placeholder="e.g. Junior Beginners" />
     </label>
     <div class="row">
-      <label class="field">Level
-        <input id="f-level" type="text" list="levels" placeholder="e.g. Beginner, Intermediate" />
-        <datalist id="levels">
-          <option>Red Ball</option><option>Orange Ball</option><option>Green Ball</option>
-          <option>Beginner</option><option>Advanced Beginner</option>
-          <option>Intermediate</option><option>Advanced</option><option>High Performance</option>
-          <option>Adult 2.5</option><option>Adult 3.0</option><option>Adult 3.5</option><option>Adult 4.0+</option>
-        </datalist>
+      <label class="field">Category
+        <select id="f-category">
+          <option value="adult">Adult</option>
+          <option value="junior">Junior</option>
+        </select>
       </label>
       <label class="field">Coach(es)
         <input id="f-coach" type="text" placeholder="e.g. Bhodi, Sam" />
+      </label>
+    </div>
+    <div class="row" id="adult-row">
+      <label class="field" style="flex:1;">Adult level
+        <select id="f-adult-level"></select>
+      </label>
+    </div>
+    <div class="row" id="junior-row" style="display:none;">
+      <label class="field">Age group
+        <select id="f-junior-age"></select>
+      </label>
+      <label class="field">Skill
+        <select id="f-junior-skill"></select>
       </label>
     </div>
     <div class="row">
@@ -228,6 +238,30 @@ const SLOTS_PER_HOUR = 60 / SLOT_MIN;
 const TOTAL_SLOTS = (END_HOUR - START_HOUR) * SLOTS_PER_HOUR;
 const SLOT_PX = 36;
 const COLORS = ['#2596b5', '#1b4458', '#95d600', '#7c4dff', '#f57c00', '#c2185b', '#00897b', '#5d4037'];
+
+const ADULT_LEVELS = [
+  'Beginner',
+  'Adv Beginner 2.0-2.5',
+  '2.5-3.0',
+  '3.0',
+  '3.0-3.5',
+  '3.5',
+  '3.5-4.0',
+  '4.0',
+  '4.0-4.5',
+  '4.5',
+  '4.5-5.0',
+];
+const JUNIOR_AGES = ['3-4', '5-8', '9-11', '12-15'];
+const JUNIOR_SKILLS = ['Beginner', 'Intermediate', 'Advanced'];
+function juniorSkillsFor(age){
+  return age === '3-4' ? ['Beginner'] : JUNIOR_SKILLS;
+}
+function composeLevel(category, adultLevel, juniorAge, juniorSkill){
+  if (category === 'adult') return adultLevel || '';
+  if (category === 'junior') return `Jr ${juniorAge} · ${juniorSkill}`;
+  return '';
+}
 
 let activeFacility = 'satc';
 let activeDay = 0;
@@ -434,6 +468,26 @@ function buildTimeOptions(){
 function buildDayOptions(){
   return DAYS.map((d,i)=>`<option value="${i}">${d}</option>`).join('');
 }
+function fillLevelSelects(){
+  document.getElementById('f-adult-level').innerHTML =
+    ADULT_LEVELS.map(l => `<option value="${l}">${l}</option>`).join('');
+  document.getElementById('f-junior-age').innerHTML =
+    JUNIOR_AGES.map(a => `<option value="${a}">${a}</option>`).join('');
+  refreshJuniorSkills();
+}
+function refreshJuniorSkills(){
+  const age = document.getElementById('f-junior-age').value;
+  const prev = document.getElementById('f-junior-skill').value;
+  const opts = juniorSkillsFor(age);
+  document.getElementById('f-junior-skill').innerHTML =
+    opts.map(s => `<option value="${s}">${s}</option>`).join('');
+  if (opts.includes(prev)) document.getElementById('f-junior-skill').value = prev;
+}
+function setCategoryUI(cat){
+  document.getElementById('f-category').value = cat;
+  document.getElementById('adult-row').style.display  = cat === 'adult'  ? '' : 'none';
+  document.getElementById('junior-row').style.display = cat === 'junior' ? '' : 'none';
+}
 function refreshSwatches(){
   const el = document.getElementById('f-colors');
   el.innerHTML = COLORS.map(c =>
@@ -464,13 +518,16 @@ function openCreate(day, startTime, endTime, court){
   document.getElementById('modalTitle').textContent = 'Add class';
   document.getElementById('deleteBtn').style.display = 'none';
   document.getElementById('f-title').value = '';
-  document.getElementById('f-level').value = '';
   document.getElementById('f-coach').value = '';
   document.getElementById('f-notes').value = '';
   document.getElementById('f-day').value = day;
   document.getElementById('f-start').value = startTime;
   document.getElementById('f-end').value = endTime;
   document.getElementById('f-semester').checked = false;
+  setCategoryUI('adult');
+  document.getElementById('f-adult-level').value = ADULT_LEVELS[0];
+  document.getElementById('f-junior-age').value = JUNIOR_AGES[1];
+  refreshJuniorSkills();
   selectedColor = COLORS[0];
   selectedCourts = [court || 1];
   refreshSwatches();
@@ -485,8 +542,20 @@ function openEdit(id){
   document.getElementById('modalTitle').textContent = 'Edit class';
   document.getElementById('deleteBtn').style.display = '';
   document.getElementById('f-title').value = b.title || '';
-  document.getElementById('f-level').value = b.level || '';
   document.getElementById('f-coach').value = b.coach || '';
+  const cat = b.category || (b.juniorAge ? 'junior' : 'adult');
+  setCategoryUI(cat);
+  if (cat === 'adult') {
+    document.getElementById('f-adult-level').value =
+      ADULT_LEVELS.includes(b.adultLevel) ? b.adultLevel : (ADULT_LEVELS.includes(b.level) ? b.level : ADULT_LEVELS[0]);
+  } else {
+    document.getElementById('f-junior-age').value =
+      JUNIOR_AGES.includes(b.juniorAge) ? b.juniorAge : JUNIOR_AGES[1];
+    refreshJuniorSkills();
+    const skills = juniorSkillsFor(document.getElementById('f-junior-age').value);
+    document.getElementById('f-junior-skill').value =
+      skills.includes(b.juniorSkill) ? b.juniorSkill : skills[0];
+  }
   document.getElementById('f-notes').value = b.notes || '';
   document.getElementById('f-day').value = b.day;
   document.getElementById('f-start').value = b.start;
@@ -502,7 +571,11 @@ function closeModal(){ document.getElementById('overlay').classList.remove('open
 
 function saveModal(){
   const title = document.getElementById('f-title').value.trim();
-  const level = document.getElementById('f-level').value.trim();
+  const category = document.getElementById('f-category').value;
+  const adultLevel = document.getElementById('f-adult-level').value;
+  const juniorAge = document.getElementById('f-junior-age').value;
+  const juniorSkill = document.getElementById('f-junior-skill').value;
+  const level = composeLevel(category, adultLevel, juniorAge, juniorSkill);
   const coach = document.getElementById('f-coach').value.trim();
   const day = +document.getElementById('f-day').value;
   const start = document.getElementById('f-start').value;
@@ -513,11 +586,12 @@ function saveModal(){
   if (timeToSlot(end) <= timeToSlot(start)) { alert('End must be after start'); return; }
   const courts = selectedCourts.slice().sort((a,b)=>a-b);
   const blocks = state[activeFacility].blocks;
+  const extras = { category, adultLevel: category==='adult'?adultLevel:null, juniorAge: category==='junior'?juniorAge:null, juniorSkill: category==='junior'?juniorSkill:null };
   if (editingId){
     const b = blocks.find(x => x.id === editingId);
-    Object.assign(b, { title, level, coach, day, start, end, notes, semester, color: selectedColor, courts });
+    Object.assign(b, { title, level, coach, day, start, end, notes, semester, color: selectedColor, courts, ...extras });
   } else {
-    blocks.push({ id: uid(), title, level, coach, day, start, end, notes, semester, color: selectedColor, courts });
+    blocks.push({ id: uid(), title, level, coach, day, start, end, notes, semester, color: selectedColor, courts, ...extras });
   }
   if (day !== activeDay) activeDay = day;
   persist(activeFacility);
@@ -539,6 +613,9 @@ function deleteBlock(){
   document.getElementById('f-day').innerHTML = buildDayOptions();
   document.getElementById('f-start').innerHTML = buildTimeOptions();
   document.getElementById('f-end').innerHTML = buildTimeOptions();
+  fillLevelSelects();
+  document.getElementById('f-category').addEventListener('change', e => setCategoryUI(e.target.value));
+  document.getElementById('f-junior-age').addEventListener('change', refreshJuniorSkills);
   document.getElementById('addBtn').onclick = () => openCreate(activeDay, '09:00', '10:00', 1);
   document.getElementById('cancelBtn').onclick = closeModal;
   document.getElementById('saveBtn').onclick = saveModal;
