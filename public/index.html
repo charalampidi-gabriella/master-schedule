@@ -286,7 +286,6 @@ function composeLevel(category, adultLevel, juniorAge, juniorSkill){
   return '';
 }
 
-const SCHED_URL = 'https://scheduling-b3x.pages.dev';
 const FIRST_EVENING_SLOT = 18; // 15:00 (3pm)
 
 let activeFacility = 'satc';
@@ -341,29 +340,10 @@ async function bootstrap(){
     }
     setSync('✓ Synced');
   } catch(e) { setSync('⚠ Offline'); }
-  // Side-load coach pools from the scheduling app (best-effort).
+  // Coach pools computed server-side from the shared D1.
   try {
-    const [coachList, sched] = await Promise.all([
-      fetch(SCHED_URL+'/api/state/coaches').then(r=>r.json()),
-      fetch(SCHED_URL+'/api/state/current_schedule').then(r=>r.json()),
-    ]);
-    const nameById = new Map(coachList.map(c => [c.id, c.name]));
-    for (const f of FACILITIES) {
-      pools[f.id] = {};
-      for (let d=0; d<7; d++) pools[f.id][d] = { morning: new Set(), evening: new Set() };
-    }
-    for (const [k,v] of Object.entries(sched||{})) {
-      const [cid,day] = k.split('_').map(Number);
-      const name = nameById.get(cid); if (!name) continue;
-      for (const shift of ['morning','evening']){
-        const loc = v[shift]; if (!loc || !pools[loc]) continue;
-        pools[loc][day][shift].add(name);
-      }
-    }
-    for (const f of FACILITIES) for (let d=0; d<7; d++) {
-      pools[f.id][d].morning = [...pools[f.id][d].morning].sort();
-      pools[f.id][d].evening = [...pools[f.id][d].evening].sort();
-    }
+    const r = await fetch('/api/pool');
+    if (r.ok) pools = await r.json();
   } catch(e) { /* pools stay empty; pool strip shows hint */ }
 }
 function persist(facId){
