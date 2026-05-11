@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s https://scheduling-b3x.pages.dev/)",
+      "Read(//c/Users/gchar/**)",
+      "Bash(rm /c/Users/gchar/sched.html)",
+      "Bash(node -e ' *)",
+      "Bash(rm sched.html)"
+    ]
+  }
+}
