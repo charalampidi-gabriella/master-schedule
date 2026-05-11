@@ -38,14 +38,22 @@ async function main(){
     }
   }
 
-  // Stringify sets, sort alphabetically.
+  // Spread coaches alphabetically across 6 court slots (Ct1..Ct5, W). Extras
+  // appended onto Court 1 comma-joined so nobody is dropped.
+  const COURT_SLOTS = 6;
+  const distribute = (set) => {
+    const arr = Array(COURT_SLOTS).fill('');
+    const list = [...set].sort();
+    for (let i = 0; i < list.length; i++) {
+      const idx = Math.min(i, COURT_SLOTS - 1);
+      arr[idx] = arr[idx] ? `${arr[idx]}, ${list[i]}` : list[i];
+    }
+    return arr;
+  };
   const flatten = (r) => {
     const out = {};
     for (let d = 0; d < 7; d++) {
-      out[d] = {
-        morning: [...r[d].morning].sort().join(', '),
-        evening: [...r[d].evening].sort().join(', '),
-      };
+      out[d] = { morning: distribute(r[d].morning), evening: distribute(r[d].evening) };
     }
     return out;
   };
@@ -68,9 +76,9 @@ async function main(){
     console.log(`✓ ${f.key}`);
     for (let d = 0; d < 7; d++) {
       const day = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d];
-      const m = merged.roster[d].morning || '—';
-      const e = merged.roster[d].evening || '—';
-      console.log(`   ${day}  morning: ${m}\n         evening: ${e}`);
+      const m = merged.roster[d].morning.map(x => x || '—').join(' | ');
+      const e = merged.roster[d].evening.map(x => x || '—').join(' | ');
+      console.log(`   ${day}  morning  ${m}\n         evening  ${e}`);
     }
   }
 }

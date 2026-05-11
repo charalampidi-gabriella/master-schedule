@@ -136,16 +136,16 @@
   .court-chip { padding: 5px 12px; border: 1px solid var(--border); background: #fff; border-radius: 999px; cursor: pointer; font-size: 13px; min-width: 40px; text-align: center; }
   .court-chip.on { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
 
-  /* Shift roster banner */
-  .roster { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 0 20px 10px; }
-  .roster-card { background: var(--plat); border: 1px solid var(--border); border-left: 4px solid var(--navy); border-radius: 6px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; }
-  .roster-card.evening { border-left-color: var(--blue); }
-  .roster-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; white-space: nowrap; }
-  .roster-time { font-size: 11px; color: var(--muted); }
-  .roster-input { flex: 1; border: 1px solid transparent; background: transparent; padding: 6px 8px; font-size: 14px; color: var(--navy); font-weight: 600; border-radius: 4px; font-family: inherit; }
-  .roster-input:hover { background: #fff; }
-  .roster-input:focus { outline: none; background: #fff; border-color: var(--green); box-shadow: 0 0 0 2px rgba(149,214,0,0.25); }
-  .roster-input::placeholder { color: #b0bcc1; font-weight: 400; }
+  /* Per-court coach strip rows (inside the grid as header rows) */
+  .gh-coach { background: #fff; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0; min-height: 32px; display: flex; align-items: stretch; }
+  .gh-coach:last-child { border-right: none; }
+  .gh-coach.label { background: var(--plat); justify-content: center; align-items: center; font-size: 10px; color: var(--navy); font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 0 6px; }
+  .gh-coach.label.morning { border-left: 4px solid var(--navy); }
+  .gh-coach.label.evening { border-left: 4px solid var(--blue); }
+  .gh-coach input { width: 100%; border: none; background: transparent; padding: 4px 8px; font: inherit; font-size: 12px; color: var(--navy); font-weight: 600; }
+  .gh-coach input:hover { background: var(--plat); }
+  .gh-coach input:focus { outline: none; background: rgba(149,214,0,0.12); box-shadow: inset 0 0 0 2px var(--green); }
+  .gh-coach input::placeholder { color: #b0bcc1; font-weight: 400; }
 
   /* Shift gap strip (2-3pm) */
   .shift-gap { position: absolute; left: 0; right: 0; background: repeating-linear-gradient(45deg, rgba(0,0,0,0.04), rgba(0,0,0,0.04) 6px, rgba(0,0,0,0.08) 6px, rgba(0,0,0,0.08) 12px); border-top: 1px dashed var(--muted); border-bottom: 1px dashed var(--muted); pointer-events: none; z-index: 2; }
@@ -171,8 +171,6 @@
     <span><span class="sample band"></span>Summer camp band (Mon–Thu 9:30–12:30)</span>
   </span>
 </div>
-
-<div class="roster" id="roster"></div>
 
 <div class="grid-wrap">
   <div class="grid" id="grid"></div>
@@ -343,7 +341,7 @@ function renderTabs(){
   ).join('');
   el.querySelectorAll('.tab').forEach(b => b.onclick = () => {
     activeFacility = b.dataset.fac;
-    renderTabs(); renderRoster(); renderGrid();
+    renderTabs(); renderGrid();
   });
 }
 function renderDayTabs(){
@@ -353,30 +351,44 @@ function renderDayTabs(){
   ).join('');
   el.querySelectorAll('.day-tab').forEach(b => b.onclick = () => {
     activeDay = +b.dataset.day;
-    renderDayTabs(); renderRoster(); renderGrid();
+    renderDayTabs(); renderGrid();
   });
 }
 
-function renderRoster(){
-  const el = document.getElementById('roster');
-  const r = (state[activeFacility].roster || {})[activeDay] || {};
-  el.innerHTML = `
-    <div class="roster-card morning">
-      <span class="roster-label">Morning</span>
-      <span class="roster-time">${MORNING_RANGE.label}</span>
-      <input class="roster-input" data-shift="morning" placeholder="Add coach(es)…" value="${escapeHtml(r.morning||'')}" />
-    </div>
-    <div class="roster-card evening">
-      <span class="roster-label">Evening</span>
-      <span class="roster-time">${EVENING_RANGE.label}</span>
-      <input class="roster-input" data-shift="evening" placeholder="Add coach(es)…" value="${escapeHtml(r.evening||'')}" />
-    </div>`;
-  el.querySelectorAll('.roster-input').forEach(inp => {
+function getRosterDay(){
+  const fac = state[activeFacility];
+  if (!fac.roster) fac.roster = {};
+  let r = fac.roster[activeDay];
+  if (!r || !Array.isArray(r.morning) || !Array.isArray(r.evening)){
+    // migrate / init
+    r = { morning: Array(COURT_COUNT).fill(''), evening: Array(COURT_COUNT).fill('') };
+    fac.roster[activeDay] = r;
+  }
+  // ensure correct length
+  while (r.morning.length < COURT_COUNT) r.morning.push('');
+  while (r.evening.length < COURT_COUNT) r.evening.push('');
+  return r;
+}
+
+function coachStripHTML(){
+  const r = getRosterDay();
+  const cells = (shift, label, labelCls) => {
+    let h = `<div class="gh-coach label ${labelCls}">${label} · ${shift==='morning'?MORNING_RANGE.label:EVENING_RANGE.label}</div>`;
+    for (let c = 0; c < COURT_COUNT; c++){
+      const v = (shift==='morning' ? r.morning[c] : r.evening[c]) || '';
+      h += `<div class="gh-coach"><input data-shift="${shift}" data-court="${c}" placeholder="Coach" value="${escapeHtml(v)}" /></div>`;
+    }
+    return h;
+  };
+  return cells('morning', 'Morning', 'morning') + cells('evening', 'Evening', 'evening');
+}
+
+function wireCoachInputs(g){
+  g.querySelectorAll('.gh-coach input').forEach(inp => {
     inp.addEventListener('change', () => {
-      const fac = state[activeFacility];
-      if (!fac.roster) fac.roster = {};
-      if (!fac.roster[activeDay]) fac.roster[activeDay] = {};
-      fac.roster[activeDay][inp.dataset.shift] = inp.value.trim();
+      const r = getRosterDay();
+      const c = +inp.dataset.court;
+      r[inp.dataset.shift][c] = inp.value.trim();
       persist(activeFacility);
     });
   });
@@ -385,9 +397,11 @@ function renderRoster(){
 function renderGrid(){
   const g = document.getElementById('grid');
   let html = '';
-  // header
+  // header row
   html += '<div class="gh">Time</div>';
   for (const lbl of COURT_LABELS) html += `<div class="gh">${lbl === 'W' ? 'Wall' : 'Court ' + lbl}</div>`;
+  // coach strip rows (morning + evening, one cell per court)
+  html += coachStripHTML();
   // time column
   html += '<div class="time-col">';
   for (let s=0; s<TOTAL_SLOTS; s++){
@@ -436,6 +450,8 @@ function renderGrid(){
     html += '</div>';
   }
   g.innerHTML = html;
+
+  wireCoachInputs(g);
 
   // wire interactions
   g.querySelectorAll('.court-col').forEach(col => {
@@ -631,7 +647,6 @@ function saveModal(){
   persist(activeFacility);
   closeModal();
   renderDayTabs();
-  renderRoster();
   renderGrid();
 }
 function deleteBlock(){
@@ -669,7 +684,6 @@ function deleteBlock(){
   renderTabs();
   renderDayTabs();
   await bootstrap();
-  renderRoster();
   renderGrid();
 })();
 </script>
